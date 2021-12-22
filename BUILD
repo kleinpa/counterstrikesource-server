@@ -1,7 +1,7 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_layer", "container_push")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
-load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_extract")
+load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_commit", "container_run_and_extract")
 
 #
 # Build Server Base Image
@@ -47,20 +47,36 @@ install_pkgs(
 # Build Counter-Strike: Source Layer
 #
 
-container_image(
-    name = "steamcmd_base",
-    base = ":server_base",
-    directory = "/opt/steam",
-    files = [
-        "@steamcmd//file",
+container_run_and_commit(
+    name = "prepare_steamcmd_repo",
+    commands = [
+        "sed -i -e's/ main/ main non-free/g' /etc/apt/sources.list",
+        "echo steam steam/question select 'I AGREE' | debconf-set-selections",
+        "echo steam steam/license note '' | debconf-set-selections",
     ],
+    image = ":server_base.tar",
+)
+
+download_pkgs(
+    name = "steamcmd_deps",
+    image_tar = ":prepare_steamcmd_repo_commit.tar",
+    packages = [
+        "steamcmd:i386",
+    ],
+)
+
+install_pkgs(
+    name = "steamcmd_base",
+    image_tar = ":prepare_steamcmd_repo_commit.tar",
+    installables_tar = ":steamcmd_deps.tar",
+    installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
+    output_image_name = "steamcmd_base",
 )
 
 container_run_and_extract(
     name = "download_counter_strike_source",
     commands = [
-        "tar -xvzf /opt/steam/steamcmd_linux.tar.gz -C /opt/steam",
-        "/opt/steam/steamcmd.sh +login anonymous +force_install_dir /opt/game +app_update 232330 validate +quit",
+        "/usr/games/steamcmd +login anonymous +force_install_dir /opt/game +app_update 232330 validate +quit",
         "rm -rf /opt/game/steamapps",
         "chown -R nobody:root /opt/game",
         "tar -czvf /archive.tar.gz /opt/game/",
@@ -93,7 +109,7 @@ install_pkgs(
     image_tar = "@container_base//image",
     installables_tar = ":map_deps.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
-    output_image_name = "server_base",
+    output_image_name = "maps_base",
 )
 
 container_image(

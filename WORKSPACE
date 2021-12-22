@@ -32,16 +32,6 @@ container_pull(
 )
 
 #
-# SteamCMD
-#
-
-http_file(
-    name = "steamcmd",
-    downloaded_file_path = "steamcmd_linux.tar.gz",
-    urls = ["https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"],
-)
-
-#
 # Server Dependencies
 #
 

@@ -20,6 +20,5 @@ touch /opt/game/cstrike/addons/sourcemod/configs/maplists.cfg
     +hostname "$CSS_HOSTNAME" \
     +rcon_password "$RCON_PASSWORD" \
     +sv_password "$CSS_PASSWORD" \
-    +sv_lan "$SV_LAN" \
     +sm_auth_by_steam_group_group_id "$STEAM_GROUP_ID" \
     +sm_auth_by_steam_group_steam_key "$STEAM_API_KEY"

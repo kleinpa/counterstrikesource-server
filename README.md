@@ -31,5 +31,3 @@ server.
 
 ``STEAM_API_KEY`` The [Steam API key](https://steamcommunity.com/dev/apikey) to
 use for the group membership checks with the Steam's Web API.
-
-``SV_LAN`` Controls if internet users can join the server. ``0`` by default.

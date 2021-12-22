@@ -127,7 +127,6 @@ container_image(
         "RCON_PASSWORD": "",
         "STEAM_GROUP_ID": "",
         "STEAM_API_KEY": "",
-        "SV_LAN": "0",
     },
     tars = [
         ":lanofdoom/archive.tar.gz",

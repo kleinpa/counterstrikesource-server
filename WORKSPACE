@@ -48,8 +48,8 @@ http_file(
 http_file(
     name = "auth_by_steam_group",
     downloaded_file_path = "auth_by_steam_group.tar.gz",
-    sha256 = "b01386378d9a1e4507e7f6e5ee8cfaf78f98d51c842181ba59aef63bac31d699",
-    urls = ["https://lanofdoom.github.io/auth-by-steam-group/releases/v2.1.0/auth_by_steam_group.tar.gz"],
+    sha256 = "17b4d546075d75ee4cf7033e00e69b42fb295dc54b31c964e531f27ae91e5a48",
+    urls = ["https://lanofdoom.github.io/auth-by-steam-group/releases/v2.1.1/auth_by_steam_group.tar.gz"],
 )
 
 http_file(

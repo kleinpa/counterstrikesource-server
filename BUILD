@@ -111,7 +111,7 @@ container_image(
 )
 
 container_run_and_extract(
-    name = "maps",
+    name = "build_maps",
     commands = [
         "cd /opt/game/cstrike",
         "./make_bz2_files.sh",
@@ -121,6 +121,13 @@ container_run_and_extract(
     ],
     extract_file = "/archive.tar.gz",
     image = ":maps_container.tar",
+)
+
+container_layer(
+    name = "maps",
+    tars = [
+        ":build_maps/archive.tar.gz",
+    ],
 )
 
 #
@@ -138,7 +145,7 @@ container_image(
 )
 
 container_run_and_extract(
-    name = "sourcemod",
+    name = "build_sourcemod",
     commands = [
         "cd /opt/game/cstrike/addons/sourcemod/plugins",
         "mv basevotes.smx disabled/basevotes.smx",
@@ -153,6 +160,13 @@ container_run_and_extract(
     ],
     extract_file = "/archive.tar.gz",
     image = ":sourcemod_container.tar",
+)
+
+container_layer(
+    name = "sourcemod",
+    tars = [
+        ":build_sourcemod/archive.tar.gz",
+    ],
 )
 
 #
@@ -196,13 +210,20 @@ container_image(
 )
 
 container_run_and_extract(
-    name = "lanofdoom",
+    name = "build_lanofdoom",
     commands = [
         "chown -R nobody:root /opt",
         "tar -czvf /archive.tar.gz /opt",
     ],
     extract_file = "/archive.tar.gz",
     image = ":config_container.tar",
+)
+
+container_layer(
+    name = "lanofdoom",
+    tars = [
+        ":build_lanofdoom/archive.tar.gz",
+    ],
 )
 
 #
@@ -226,11 +247,9 @@ container_image(
     },
     layers = [
         ":counter_strike_source",
-    ],
-    tars = [
-        ":lanofdoom/archive.tar.gz",
-        ":maps/archive.tar.gz",
-        ":sourcemod/archive.tar.gz",
+        ":maps",
+        ":sourcemod",
+        ":lanofdoom",
     ],
     user = "nobody",
 )

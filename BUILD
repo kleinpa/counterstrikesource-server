@@ -4,29 +4,52 @@ load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "instal
 load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_extract")
 
 #
-# Download Counter-Strike: Source via SteamCMD
+# Build Server Base Image
 #
 
+container_run_and_extract(
+    name = "enable_i386_sources",
+    commands = [
+        "dpkg --add-architecture i386",
+    ],
+    extract_file = "/var/lib/dpkg/arch",
+    image = "@container_base//image",
+)
+
+container_image(
+    name = "container_base_with_i386_packages",
+    base = "@container_base//image",
+    directory = "/var/lib/dpkg",
+    files = [
+        ":enable_i386_sources/var/lib/dpkg/arch",
+    ],
+)
+
 download_pkgs(
-    name = "steamcmd_deps",
-    image_tar = "@container_base//image",
+    name = "server_deps",
+    image_tar = ":container_base_with_i386_packages.tar",
     packages = [
-        "ca-certificates",
-        "lib32gcc1",
+        "ca-certificates:i386",
+        "lib32gcc-s1",
+        "libcurl4:i386",
     ],
 )
 
 install_pkgs(
-    name = "steamcmd_deps_installed",
-    image_tar = "@container_base//image",
-    installables_tar = "steamcmd_deps.tar",
+    name = "server_base",
+    image_tar = ":container_base_with_i386_packages.tar",
+    installables_tar = ":server_deps.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
-    output_image_name = "steamcmd_deps_installed",
+    output_image_name = "server_base",
 )
+
+#
+# Build Counter-Strike: Source Layer
+#
 
 container_image(
     name = "steamcmd_base",
-    base = ":steamcmd_deps_installed",
+    base = ":server_base",
     directory = "/opt/steam",
     files = [
         "@steamcmd//file",
@@ -54,56 +77,28 @@ container_layer(
 )
 
 #
-# Build Server Base Image With i386 Enabled
-#
-
-container_run_and_extract(
-    name = "enable_i386_sources",
-    commands = [
-        "dpkg --add-architecture i386",
-    ],
-    extract_file = "/var/lib/dpkg/arch",
-    image = "@container_base//image",
-)
-
-container_image(
-    name = "container_base_with_i386_packages",
-    base = "@container_base//image",
-    directory = "/var/lib/dpkg",
-    files = [
-        ":enable_i386_sources/var/lib/dpkg/arch",
-    ],
-)
-
-#
-# Server Image
+# Build Maps Layer
 #
 
 download_pkgs(
-    name = "server_deps",
-    image_tar = ":container_base_with_i386_packages.tar",
+    name = "map_deps",
+    image_tar = "@container_base//image",
     packages = [
-        "ca-certificates:i386",
-        "lib32gcc1",
-        "libcurl4:i386",
+        "bzip2",
     ],
 )
 
 install_pkgs(
-    name = "server_base",
-    image_tar = ":container_base_with_i386_packages.tar",
-    installables_tar = ":server_deps.tar",
+    name = "maps_base",
+    image_tar = "@container_base//image",
+    installables_tar = ":map_deps.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
     output_image_name = "server_base",
 )
 
-#
-# Build Maps Layer
-#
-
 container_image(
     name = "maps_container",
-    base = "@container_base//image",
+    base = ":maps_base",
     directory = "/opt/game/cstrike",
     tars = [
         "@maps//file",

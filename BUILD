@@ -1,5 +1,101 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_layer", "container_push")
+load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
+load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_extract")
+
+#
+# Download Counter-Strike: Source via SteamCMD
+#
+
+download_pkgs(
+    name = "steamcmd_deps",
+    image_tar = "@container_base//image",
+    packages = [
+        "ca-certificates",
+        "lib32gcc1",
+    ],
+)
+
+install_pkgs(
+    name = "steamcmd_deps_installed",
+    image_tar = "@container_base//image",
+    installables_tar = "steamcmd_deps.tar",
+    installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
+    output_image_name = "steamcmd_deps_installed",
+)
+
+container_image(
+    name = "steamcmd_base",
+    base = ":steamcmd_deps_installed",
+    directory = "/opt/steam",
+    files = [
+        "@steamcmd//file",
+    ],
+)
+
+container_run_and_extract(
+    name = "download_counter_strike_source",
+    commands = [
+        "tar -xvzf /opt/steam/steamcmd_linux.tar.gz -C /opt/steam",
+        "/opt/steam/steamcmd.sh +login anonymous +force_install_dir /opt/game +app_update 232330 validate +quit",
+        "rm -rf /opt/game/steamapps",
+        "chown -R nobody:root /opt/game",
+        "tar -czvf /archive.tar.gz /opt/game/",
+    ],
+    extract_file = "/archive.tar.gz",
+    image = ":steamcmd_base.tar",
+)
+
+container_layer(
+    name = "counter_strike_source",
+    tars = [
+        ":download_counter_strike_source/archive.tar.gz",
+    ],
+)
+
+#
+# Build Server Base Image With i386 Enabled
+#
+
+container_run_and_extract(
+    name = "enable_i386_sources",
+    commands = [
+        "dpkg --add-architecture i386",
+    ],
+    extract_file = "/var/lib/dpkg/arch",
+    image = "@container_base//image",
+)
+
+container_image(
+    name = "container_base_with_i386_packages",
+    base = "@container_base//image",
+    directory = "/var/lib/dpkg",
+    files = [
+        ":enable_i386_sources/var/lib/dpkg/arch",
+    ],
+)
+
+#
+# Server Image
+#
+
+download_pkgs(
+    name = "server_deps",
+    image_tar = ":container_base_with_i386_packages.tar",
+    packages = [
+        "ca-certificates:i386",
+        "lib32gcc1",
+        "libcurl4:i386",
+    ],
+)
+
+install_pkgs(
+    name = "server_base",
+    image_tar = ":container_base_with_i386_packages.tar",
+    installables_tar = ":server_deps.tar",
+    installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
+    output_image_name = "server_base",
+)
 
 #
 # Build Maps Layer
@@ -7,7 +103,7 @@ load("@io_bazel_rules_docker//docker/util:run.bzl", "container_run_and_extract")
 
 container_image(
     name = "maps_container",
-    base = "@ubuntu//image",
+    base = "@container_base//image",
     directory = "/opt/game/cstrike",
     tars = [
         "@maps//file",
@@ -33,7 +129,7 @@ container_run_and_extract(
 
 container_image(
     name = "sourcemod_container",
-    base = "@ubuntu//image",
+    base = "@container_base//image",
     directory = "/opt/game/cstrike",
     tars = [
         "@metamod//file",
@@ -91,7 +187,7 @@ container_layer(
 
 container_image(
     name = "config_container",
-    base = "@ubuntu//image",
+    base = "@container_base//image",
     layers = [
         ":lanofdoom_server_config",
         ":lanofdoom_server_entrypoint",
@@ -115,7 +211,7 @@ container_run_and_extract(
 
 container_image(
     name = "server_image",
-    base = "@server_base//image",
+    base = ":server_base",
     entrypoint = ["/opt/game/entrypoint.sh"],
     env = {
         "CSS_ADMIN": "",
@@ -128,6 +224,9 @@ container_image(
         "STEAM_GROUP_ID": "",
         "STEAM_API_KEY": "",
     },
+    layers = [
+        ":counter_strike_source",
+    ],
     tars = [
         ":lanofdoom/archive.tar.gz",
         ":maps/archive.tar.gz",

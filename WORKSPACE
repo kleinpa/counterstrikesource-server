@@ -1,11 +1,10 @@
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "59d5b42ac315e7eadffa944e86e90c2990110a1c8075f1cd145f487e999d22b3",
-    strip_prefix = "rules_docker-0.17.0",
-    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.17.0/rules_docker-v0.17.0.tar.gz"],
+    sha256 = "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
+    strip_prefix = "rules_docker-0.22.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
 )
 
 load(
@@ -20,6 +19,31 @@ load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
 container_deps()
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+
+#
+# Container Base Image
+#
+
+container_pull(
+    name = "container_base",
+    registry = "index.docker.io",
+    repository = "library/ubuntu",
+    tag = "focal",
+)
+
+#
+# SteamCMD
+#
+
+http_file(
+    name = "steamcmd",
+    downloaded_file_path = "steamcmd_linux.tar.gz",
+    urls = ["https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"],
+)
+
+#
+# Server Dependencies
+#
 
 http_file(
     name = "auth_by_steam_group",
@@ -61,17 +85,4 @@ http_file(
     downloaded_file_path = "sourcemod.tar.gz",
     sha256 = "e8dac72aeb3df8830c46234d7e22c51f92d140251ca72937eb0afed05cd32c66",
     urls = ["https://sm.alliedmods.net/smdrop/1.10/sourcemod-1.10.0-git6502-linux.tar.gz"],
-)
-
-container_pull(
-    name = "ubuntu",
-    registry = "index.docker.io",
-    repository = "library/ubuntu",
-    tag = "focal",
-)
-
-container_pull(
-    name = "server_base",
-    registry = "ghcr.io",
-    repository = "lanofdoom/counterstrikesource-base/counterstrikesource-base"
 )

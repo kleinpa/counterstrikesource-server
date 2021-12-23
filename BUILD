@@ -270,6 +270,6 @@ container_push(
     format = "Docker",
     image = ":server_image",
     registry = "ghcr.io",
-    repository = "lanofdoom/counterstrikesource-server/counterstrikesource-server",
+    repository = "lanofdoom/counterstrikesource-server",
     tag = "latest",
 )

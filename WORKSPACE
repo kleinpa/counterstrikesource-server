@@ -43,6 +43,13 @@ http_file(
 )
 
 http_file(
+    name = "deathmatch",
+    downloaded_file_path = "lan_of_doom_deathmatch.tar.gz",
+    sha256 = "7a195a24a3691033c565b10dbbba9d4bf017745f41b6ed6fa1e5e94c53a268e0",
+    urls = ["https://lanofdoom.github.io/counterstrike-deathmatch/releases/v1.0.0/lan_of_doom_deathmatch.tar.gz"],
+)
+
+http_file(
     name = "maps",
     downloaded_file_path = "maps.tar.xz",
     sha256 = "00bafd77b190892fe55480976e51c6dc67507085488ca323dc418655b696826e",

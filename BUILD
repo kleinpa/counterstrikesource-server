@@ -205,6 +205,7 @@ container_layer(
     directory = "/opt/game/cstrike",
     tars = [
         "@auth_by_steam_group//file",
+        "@deathmatch//file",
         "@map_settings//file",
         "@max_cash//file",
     ],

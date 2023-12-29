@@ -1,5 +1,6 @@
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push", "oci_tarball")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
 
 #
 # Counter-Strike: Source Layer
@@ -29,8 +30,8 @@ pkg_tar(
 
 pkg_tar(
     name = "metamod_layer",
-    deps = ["@metamod//file"],
     package_dir = "/opt/game/cstrike",
+    deps = ["@metamod//file"],
 )
 
 #
@@ -39,9 +40,9 @@ pkg_tar(
 
 pkg_tar(
     name = "sourcemod_layer",
-    deps = ["@sourcemod//file"],
     empty_dirs = ["/opt/game/cstrike/addons/sourcemod/configs"],
     package_dir = "/opt/game/cstrike",
+    deps = ["@sourcemod//file"],
 )
 
 #
@@ -104,7 +105,7 @@ pkg_tar(
 
 oci_image(
     name = "image",
-    base = "@debian_i386",
+    base = "@debian",
     entrypoint = ["/entrypoint.sh"],
     env = {
         "CSS_HOSTNAME": "",
@@ -139,4 +140,17 @@ oci_push(
     image = ":image",
     remote_tags = ["latest"],
     repository = "ghcr.io/lanofdoom/counterstrikesource-server",
+)
+
+build_test(
+    name = "image_test",
+    targets = [":image"],
+)
+
+platform(
+    name = "linux",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:i386",
+    ],
 )

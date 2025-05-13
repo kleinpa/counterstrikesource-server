@@ -1,5 +1,9 @@
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push", "oci_tarball")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
+load("@rules_pkg//:mappings.bzl", "pkg_files")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("//:mapcycle.bzl", "mapcycle_file")
+load("//:steamapps.bzl", "BUILD_counterstrikesource_dedicated")
 
 #
 # Counter-Strike: Source Layer
@@ -7,7 +11,9 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "counterstrikesource_layer",
-    srcs = ["@counter_strike_source//:files"],
+    srcs = [
+        "@counterstrikesource_dedicated//:files",
+    ],
     package_dir = "/opt/game",
 )
 
@@ -15,12 +21,22 @@ pkg_tar(
 # Maps Layer
 #
 
+mapcycle_file(
+    name = "mapcycle",
+    map_archive = "@maps//file",
+)
+
+pkg_files(
+    name = "mapcycle_files",
+    srcs = [":mapcycle"],
+    prefix = "/opt/game/cstrike/cfg",
+)
+
 pkg_tar(
     name = "maps_layer",
+    srcs = [":mapcycle_files"],
     package_dir = "/opt/game/cstrike",
-    deps = [
-        "@maps//file",
-    ],
+    deps = ["@maps//file"],
 )
 
 #
@@ -30,7 +46,7 @@ pkg_tar(
 pkg_tar(
     name = "metamod_layer",
     package_dir = "/opt/game/cstrike",
-    deps = ["@metamod//file"],
+    deps = ["@metamod_linux//file"],
 )
 
 #
@@ -41,7 +57,7 @@ pkg_tar(
     name = "sourcemod_layer",
     empty_dirs = ["/opt/game/cstrike/addons/sourcemod/configs"],
     package_dir = "/opt/game/cstrike",
-    deps = ["@sourcemod//file"],
+    deps = ["@sourcemod_linux//file"],
 )
 
 #
@@ -51,7 +67,7 @@ pkg_tar(
 pkg_tar(
     name = "authorization_layer",
     package_dir = "/opt/game/cstrike",
-    deps = ["@auth_by_steam_group//file"],
+    deps = ["@auth_by_steam_group_linux//file"],
 )
 
 #
@@ -81,13 +97,20 @@ pkg_tar(
 # Config Layer
 #
 
-pkg_tar(
-    name = "config_layer",
-    srcs = [":server.cfg"],
-    package_dir = "/opt/game/cstrike/cfg/templates",
+pkg_files(
+    name = "config_files",
+    srcs = glob(["config/**"]),
+    strip_prefix = "config",
 )
 
-# TODO: libcurl
+pkg_tar(
+    name = "config_layer",
+    srcs = [
+        ":config_files",
+        ":server.cfg",
+    ],
+    package_dir = "/opt/game/cstrike/cfg",
+)
 
 #
 # Final Image
@@ -95,40 +118,42 @@ pkg_tar(
 
 pkg_tar(
     name = "entrypoint_layer",
-    srcs = [":entrypoint.sh"],
     package_dir = "/",
-    symlinks = {
-        "/root/.steam/sdk32/steamclient.so": "/opt/game/bin/steamclient.so",
-    },
+    symlinks = {"/root/.steam/sdk32/steamclient.so": "/opt/game/bin/steamclient.so"},
+)
+
+oci_image(
+    name = "base",
+    base = "@counterstrikesource-server-steamcmd",
+    entrypoint = [
+        "/opt/game/srcds_linux",
+        "-game",
+        "cstrike",
+        "+ip",
+        "0.0.0.0",
+    ],
+    env = {"LD_LIBRARY_PATH": "/opt/game:/opt/game/bin"},
+    tars = [
+        ":counterstrikesource_layer",
+    ],
+    workdir = "/opt/game",
 )
 
 oci_image(
     name = "image",
-    base = "@debian_i386",
-    entrypoint = ["/entrypoint.sh"],
-    env = {
-        "CSS_HOSTNAME": "",
-        "CSS_MAP": "de_dust2",
-        "CSS_MOTD": "",
-        "CSS_PASSWORD": "",
-        "CSS_PORT": "27015",
-        "RCON_PASSWORD": "",
-        "STEAM_GROUP_ID": "",
-        "STEAM_API_KEY": "",
-    },
+    base = ":base",
     tars = [
-        ":counterstrikesource_layer",
         ":maps_layer",
         ":metamod_layer",
         ":sourcemod_layer",
-        ":authorization_layer",
+        # ":authorization_layer",
         ":plugins_layer",
         ":config_layer",
         ":entrypoint_layer",
     ],
 )
 
-oci_tarball(
+oci_load(
     name = "image_tarball",
     image = ":image",
     repo_tags = ["counterstrikesource-server:bazel"],
@@ -137,6 +162,16 @@ oci_tarball(
 oci_push(
     name = "image_push",
     image = ":image",
-    remote_tags = ["latest"],
-    repository = "ghcr.io/lanofdoom/counterstrikesource-server",
+    remote_tags = [
+        "latest",
+        "build{}".format(BUILD_counterstrikesource_dedicated),
+    ],
+    repository = "ghcr.io/kleinpa/counterstrikesource-server",
+)
+
+build_test(
+    name = "build_test",
+    targets = [
+        ":image",
+    ],
 )

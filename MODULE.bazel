@@ -1,27 +1,24 @@
-module(name = "counterstrikesource_server")
+module(name = "counterstrikesource-server")
 
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_pkg", version = "0.9.1")
-bazel_dep(name = "rules_oci", version = "1.4.3")
+bazel_dep(name = "rules_oci", version = "2.2.2")
 bazel_dep(name = "rules_steam")
 
 git_override(
     module_name = "rules_steam",
-    commit = "a177cd8197fa887fe4bd33cfe0a54a8adc3e36a0",
-    remote = "https://github.com/lanofdoom/rules_steam.git",
+    commit = "e15bbc46a91d46c5e04ef4710afc0b7facd6ae37",
+    remote = "https://github.com/kleinpa/rules_steam.git",
 )
 
-steam = use_extension("@rules_steam//:steam.bzl", "steam")
-steam.app(name = "counter_strike_source", app = "232330")
-use_repo(steam, "counter_strike_source")
-
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
-
 oci.pull(
     name = "debian_i386",
     tag = "bookworm-slim",
     image = "docker.io/i386/debian",
+    platforms = ["linux/386"],
 )
-use_repo(oci, "debian_i386")
+use_repo(oci, "debian_i386", "debian_i386_linux_386")
 
 repos = use_extension("//:repos.bzl", "repos_bzlmod")
 use_repo(
@@ -43,3 +40,6 @@ use_repo(
     "spawn_protection",
     "sourcemod",
 )
+
+steamapps = use_extension("//:steamapps.bzl", "steamapps_bzlmod")
+use_repo(steamapps, "counterstrikesource_dedicated")

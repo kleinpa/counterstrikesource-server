@@ -1,0 +1,17 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+    "features": {
+      "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+          "ghcr.io/devcontainers-community/features/bazel:1": {
+              "bazelisk_version": "latest",
+              "buildifier_version": "latest"
+          }
+    },
+    "appPort": ["27015:27015/udp"],
+    "customizations": {
+      "vscode": {
+        "extensions": ["BazelBuild.vscode-bazel"]
+      }
+    }
+  }
+  

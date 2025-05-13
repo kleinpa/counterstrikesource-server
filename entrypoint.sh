@@ -1,7 +1,7 @@
 #!/bin/bash -ue
 
 # Install auth_by_steam_group dependencies
-apt-get update && apt-get install -y ca-certificates libcurl4
+# apt-get update && apt-get install -y ca-certificates libcurl4
 
 # Set MOTD
 [ -z "${CSS_MOTD}" ] || echo "${CSS_MOTD}" > /opt/game/cstrike/motd.txt

@@ -1,4 +1,1 @@
-bazel-bin
-bazel-out
-bazel-counterstrikesource-server
-bazel-testlogs
+/bazel-*

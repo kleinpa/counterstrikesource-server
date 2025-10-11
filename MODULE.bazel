@@ -2,7 +2,7 @@ module(name = "counterstrikesource-server")
 
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "rules_pkg", version = "1.1.0")
-bazel_dep(name = "rules_oci", version = "2.2.2")
+bazel_dep(name = "rules_oci", version = "2.2.6")
 bazel_dep(name = "curl", version = "8.11.0")
 bazel_dep(name = "rules_steam")
 

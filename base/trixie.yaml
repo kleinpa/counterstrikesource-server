@@ -1,0 +1,63 @@
+# The Debian packages that make up the image's userland.
+#
+# This replaces the steamcmd image the server used to be layered on top of:
+# ~100 packages, of which the game linked against four.
+#
+# The list is what `objdump -p` reports as NEEDED across srcds_linux64,
+# bin/linux64/*.so, cstrike/bin/linux64/server_srv.so, the Steamworks redist and
+# the Metamod/SourceMod binaries, mapped back to the packages that own them:
+#
+#   libc6      libc, libm, libdl, libpthread, librt, libmvec, ld-linux
+#   libgcc-s1  libgcc_s.so.1
+#   libstdc++6 libstdc++.so.6
+#   zlib1g     libz.so.1
+#
+# Three NEEDED entries are deliberately absent, because the steamcmd image did
+# not supply them either and the server runs regardless: libcurl-gnutls.so.4,
+# which only replay_srv.so wants, and the libncurses.so.5/libtinfo.so.5 pair
+# that dedicated_srv.so dlopens for its interactive console -- a dedicated
+# server started without a tty never gets that far.
+#
+# Trixie rather than bookworm, and this is the file that carries the build's ABI
+# contract now that there is no pinned C++ toolchain (see MODULE.bazel).
+#
+# The Metamod and SourceMod addons are compiled by whoever runs the build and
+# then dlopen'd by srcds in here, so this userland has to be at least as new as
+# the glibc and libstdc++ they were compiled against. That direction is the safe
+# one -- both libraries only ever add symbol versions, so an old binary runs
+# against a new library, never the reverse. Valve's own binaries are from 2012
+# and are the extreme case of that.
+#
+# Trixie's glibc 2.41 and libstdc++ 3.4.33 (GCC 14) clear a current build host
+# with room to spare: a Fedora 42 toolchain emits nothing newer than GLIBC_2.38
+# -- its headers redirect sscanf and strtol to the C23 variants added there --
+# and GLIBCXX_3.4.30. Bookworm's glibc 2.36 did not clear it, which is what
+# `Failed to load plugin "addons/metamod/bin/linux64/server"` was.
+#
+# So the maintenance rule is the inverse of the usual one: this snapshot must
+# move *forward* to stay ahead of the newest host anyone builds on. A host newer
+# than what is pinned here shows up as Metamod or SourceMod failing to load, and
+# `objdump -p` on the built .so files against the versions this ships names the
+# symbol that did it.
+#
+# Snapshot URLs pin the archive to a point in time, so a lockfile generated
+# today still resolves after Debian publishes a new point release. Nothing
+# updates the date automatically; after editing it, regenerate the lockfile:
+#
+#     bazel run @trixie//:lock
+version: 1
+
+sources:
+  - channel: trixie main
+    url: https://snapshot.debian.org/archive/debian/20260801T000000Z
+  - channel: trixie-security main
+    url: https://snapshot.debian.org/archive/debian-security/20260801T000000Z
+
+archs:
+  - amd64
+
+packages:
+  - libc6
+  - libgcc-s1
+  - libstdc++6
+  - zlib1g

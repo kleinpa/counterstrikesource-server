@@ -1,0 +1,31 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "server_test",
+    size = "medium",
+    srcs = ["server_test.py"],
+    data = ["//:image_tarball"],
+    # The image under test is supplied through the environment rather than as
+    # a fixture argument: load_image() reads it from here once and caches it,
+    # so a test method can start as many Server() containers as it needs
+    # without threading the image reference through every call.
+    env = {
+        "SRCDS_IMAGE_LOADER": "$(rlocationpath //:image_tarball)",
+        "SRCDS_REPO_TAG": "counterstrikesource-server:bazel",
+    },
+    tags = [
+        # Talks to the host's container daemon and pulls nothing, but the
+        # sandbox would hide the daemon socket and the test needs to reach
+        # the container's published port.
+        "no-sandbox",
+        #"requires-network",
+        # Starting a 3 GB game server is not something to do in parallel
+        # with dozens of other actions.
+        "exclusive",
+    ],
+    deps = [
+        "@pypi//python_a2s",
+        "@pypi//testcontainers",
+        "@rules_python//python/runfiles",
+    ],
+)

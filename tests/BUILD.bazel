@@ -2,8 +2,13 @@ load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
     name = "server_test",
-    size = "medium",
-    srcs = ["server_test.py"],
+    # Passing takes about a minute, but unittest only reports failures at the
+    # end, so a run in which many tests time out still has to get there.
+    size = "large",
+    srcs = [
+        "server_test.py",
+        "srcds.py",
+    ],
     data = ["//:image_tarball"],
     # The image under test is supplied through the environment rather than as
     # a fixture argument: load_image() reads it from here once and caches it,
@@ -13,6 +18,7 @@ py_test(
         "SRCDS_IMAGE_LOADER": "$(rlocationpath //:image_tarball)",
         "SRCDS_REPO_TAG": "counterstrikesource-server:bazel",
     },
+    imports = ["."],
     tags = [
         # Talks to the host's container daemon and pulls nothing, but the
         # sandbox would hide the daemon socket and the test needs to reach
@@ -25,7 +31,6 @@ py_test(
     ],
     deps = [
         "@counterstrikesource-server_pypi//python_a2s",
-        "@counterstrikesource-server_pypi//testcontainers",
         "@rules_python//python/runfiles",
     ],
 )

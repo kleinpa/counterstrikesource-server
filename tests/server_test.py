@@ -3,114 +3,15 @@
 These start the real image in a container and interrogate it over Valve's A2S
 query protocol, which is the same thing the Steam server browser does. If these
 pass, a client can find and join the server.
-
-The image under test is supplied by Bazel through two environment variables set
-by the ``srcds_container_test`` macro:
-
-``SRCDS_IMAGE_LOADER``
-    Runfiles path of an ``oci_load`` runnable that imports the image into the
-    local container daemon. Executed once per test binary.
-
-``SRCDS_REPO_TAG``
-    The tag ``SRCDS_IMAGE_LOADER`` applies to the image.
 """
 
-import functools
 import os
-import subprocess
 import sys
-import time
 import unittest
 
-import a2s
-from python.runfiles import runfiles
-from testcontainers.core.container import DockerContainer
+from srcds import Server
 
-# srcds needs to mount the map, start the engine and hand off to SourceMod
-# before it answers A2S. Cold containers on a loaded machine can take a while.
-_STARTUP_TIMEOUT_SECONDS = 120.0
-_QUERY_TIMEOUT_SECONDS = 2.0
-_POLL_INTERVAL_SECONDS = 1.0
-
-_GAME_PORT = 27015
-
-
-class ContainerError(AssertionError):
-    """Raised when the container fails to start or fails to become ready."""
-
-
-@functools.cache
-def load_image() -> str:
-    """Imports the image under test into the container daemon.
-
-    Returns the repository tag the image was loaded under. The result is cached
-    so that a test binary with many test cases only pays for one import.
-    """
-    tag = os.environ["SRCDS_REPO_TAG"]
-    loader = runfiles.Create().Rlocation(os.environ["SRCDS_IMAGE_LOADER"])
-    if loader is None or not os.path.exists(loader):
-        raise ContainerError(
-            f"image loader {os.environ['SRCDS_IMAGE_LOADER']!r} missing from runfiles"
-        )
-    subprocess.run([loader], check=True, stdout=subprocess.DEVNULL)
-    return tag
-
-
-def address(container: DockerContainer) -> tuple:
-    """Returns the (host, port) A2S is reachable at for a started container."""
-    return ("127.0.0.1", container.get_exposed_port(_GAME_PORT))
-
-
-def logs(container: DockerContainer) -> str:
-    """Returns the container's combined stdout and stderr so far.
-
-    Every container in this module is started with `tty=True`: srcds detects a
-    non-tty stdout and fully block-buffers it, so without a tty the engine, SM
-    and plugin log lines this module polls for never reach the log stream
-    until the buffer fills or the process exits -- long after any assertion
-    here would have already timed out.
-    """
-    stdout, stderr = container.get_logs()
-    return stdout.decode(errors="replace") + stderr.decode(errors="replace")
-
-
-def wait_for_a2s(container: DockerContainer) -> None:
-    """Blocks until the server answers A2S, or raises with the server log."""
-    deadline = time.monotonic() + _STARTUP_TIMEOUT_SECONDS
-    last_error = None
-    while time.monotonic() < deadline:
-        wrapped = container.get_wrapped_container()
-        wrapped.reload()
-        if wrapped.status != "running":
-            raise ContainerError(
-                f"server exited during startup:\n{logs(container)}")
-        try:
-            a2s.info(address(container), timeout=_QUERY_TIMEOUT_SECONDS)
-            return
-        except Exception as error:  # socket timeouts, partial responses, ...
-            last_error = error
-        time.sleep(_POLL_INTERVAL_SECONDS)
-    raise ContainerError(
-        f"server did not answer A2S within {_STARTUP_TIMEOUT_SECONDS:.0f}s "
-        f"(last error: {last_error!r}):\n{logs(container)}")
-
-
-def wait_for_plugins_loaded(container: DockerContainer, plugins) -> None:
-    """Blocks until every name in `plugins` reports a successful load.
-
-    Plugin loading finishes shortly after the server starts answering A2S, not
-    before, so this polls the log rather than taking a single snapshot.
-    """
-    deadline = time.monotonic() + _STARTUP_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        server_logs = logs(container)
-        if all(f"Loaded plugin {plugin} successfully" in server_logs
-               for plugin in plugins):
-            return
-        time.sleep(_POLL_INTERVAL_SECONDS)
-    raise ContainerError(
-        f"not all plugins loaded within {_STARTUP_TIMEOUT_SECONDS:.0f}s:\n"
-        f"{logs(container)}")
+_RCON_PASSWORD = "hunter2"
 
 
 class BootTest(unittest.TestCase):
@@ -118,11 +19,8 @@ class BootTest(unittest.TestCase):
 
     def test_default_command_answers_a2s(self):
         """With no arguments the image's own cmd has to produce a live server."""
-        with DockerContainer(
-                load_image()).with_kwargs(init=True, tty=True).with_exposed_ports(
-                    f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            info = a2s.info(address(container), timeout=_QUERY_TIMEOUT_SECONDS)
+        with Server() as server:
+            info = server.info()
             self.assertEqual(info.map_name, "de_dust2")
             self.assertEqual(info.folder, "cstrike")
             self.assertEqual(info.game, "Counter-Strike: Source")
@@ -133,12 +31,8 @@ class BootTest(unittest.TestCase):
 
     def test_args_override_the_default_map(self):
         """A deployment overriding cmd, as a Kubernetes `args:` does."""
-        with DockerContainer(load_image()).with_kwargs(init=True, tty=True).with_command(
-            ["+map",
-             "de_nuke"]).with_exposed_ports(f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            info = a2s.info(address(container), timeout=_QUERY_TIMEOUT_SECONDS)
-            self.assertEqual(info.map_name, "de_nuke")
+        with Server("+map", "de_nuke") as server:
+            self.assertEqual(server.info().map_name, "de_nuke")
 
     def test_boots_on_a_custom_map(self):
         """Custom maps are merged into the image from a separate repo at build
@@ -147,23 +41,34 @@ class BootTest(unittest.TestCase):
         one catches that merge landing the .bsp anywhere other than
         cstrike/maps/, which a built-in map can never catch.
         """
-        with DockerContainer(load_image()).with_kwargs(init=True, tty=True).with_command(
-            ["+map",
-             "breakfloor"]).with_exposed_ports(f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            info = a2s.info(address(container), timeout=_QUERY_TIMEOUT_SECONDS)
-            self.assertEqual(info.map_name, "breakfloor")
+        with Server("+map", "breakfloor") as server:
+            self.assertEqual(server.info().map_name, "breakfloor")
 
     def test_server_cfg_is_executed(self):
         """server.cfg only takes effect if the engine execs it on map load."""
-        with DockerContainer(
-                load_image()).with_kwargs(init=True, tty=True).with_exposed_ports(
-                    f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            rules = a2s.rules(address(container),
-                              timeout=_QUERY_TIMEOUT_SECONDS)
+        with Server() as server:
+            rules = server.rules()
             self.assertEqual(rules["mp_startmoney"], "16000")
             self.assertEqual(rules["mp_timelimit"], "25")
+
+    def test_console_is_streamed_without_a_tty(self):
+        """A line reaches the container log as soon as it is printed.
+
+        Nothing follows the line to push it out of a stdout buffer, so this
+        fails if our launcher stops line-buffering stdout.
+        """
+        with Server("+map", "de_dust2", "+rcon_password",
+                    _RCON_PASSWORD) as server:
+            server.wait_for_logs("Loaded plugin empty_team_bots.smx")
+            server.rcon(_RCON_PASSWORD, "echo console-sentinel")
+            server.wait_for_logs("console-sentinel")
+
+    def test_exits_when_signalled(self):
+        """Ctrl-C and `docker stop` work, although the server runs as PID 1 and
+        the kernel ignores signals that PID 1 does not handle."""
+        for signal, exit_code in (("SIGINT", 130), ("SIGTERM", 143)):
+            with self.subTest(signal), Server() as server:
+                self.assertEqual(server.kill(signal), exit_code)
 
 
 class AddonTest(unittest.TestCase):
@@ -176,14 +81,9 @@ class AddonTest(unittest.TestCase):
         plugins" just as happily, and a SourceMod that cannot start is exactly
         what that looks like.
         """
-        with DockerContainer(
-                load_image()).with_kwargs(init=True, tty=True).with_exposed_ports(
-                    f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            server_logs = logs(container)
-            self.assertNotIn("[META] Failed to load plugin", server_logs)
-            self.assertIn("[META] Loaded 1 plugin", server_logs,
-                          "Metamod did not load SourceMod")
+        with Server() as server:
+            server.wait_for_logs("[META] Loaded 1 plugin")
+            self.assertNotIn("[META] Failed to load plugin", server.logs())
 
     _EXPECTED_PLUGINS = (
         "lan_of_doom_disable_buyzones.smx",
@@ -208,15 +108,30 @@ class AddonTest(unittest.TestCase):
         plugin still compiles fine, but fails at runtime because the 64-bit
         engine only looks under addons/sourcemod/extensions/x64.
         """
-        with DockerContainer(
-                load_image()).with_kwargs(init=True, tty=True).with_exposed_ports(
-                    f"{_GAME_PORT}/udp") as container:
-            wait_for_a2s(container)
-            wait_for_plugins_loaded(container, self._EXPECTED_PLUGINS)
-            server_logs = logs(container)
-            for plugin in self._EXPECTED_PLUGINS:
-                self.assertIn(f"Loaded plugin {plugin} successfully",
-                              server_logs, f"{plugin} did not load")
+        with Server() as server:
+            server.wait_for_logs(*(f"Loaded plugin {plugin} successfully"
+                                   for plugin in self._EXPECTED_PLUGINS))
+
+    def test_override_tickrate_loads(self):
+        """-tickrate takes effect, which needs the override_tickrate extension.
+
+        No plugin requires that extension, so nothing else here notices when
+        SourceMod does not load it.
+        """
+        with Server("-tickrate", "100", "+map", "de_dust2") as server:
+            server.wait_for_logs("setting tickrate to 100.0")
+
+    def test_mapcycle_lists_the_installed_maps(self):
+        """The generated mapcycle.txt reaches SourceMod with both sources of
+        maps in it, and without the test maps that are excluded from it."""
+        with Server("+map", "de_dust2", "+rcon_password",
+                    _RCON_PASSWORD) as server:
+            server.wait_for_logs("Loaded plugin nextmap.smx successfully")
+            maps = server.rcon(_RCON_PASSWORD, "listmaps").splitlines()
+            self.assertIn("de_nuke", maps, "built-in maps are missing")
+            self.assertIn("breakfloor", maps, "custom maps are missing")
+            self.assertNotIn("test_hardware", maps)
+            self.assertNotIn("test_speakers", maps)
 
 
 def main() -> None:

@@ -33,9 +33,9 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
 
-      - run: ./update-steamapps.sh
-
-      - run: bazel mod deps
+      - run: |
+          bazel run //:update_steamapps
+          bazel run //:update_steamapps_steamworks
 
       - name: Check for changes
         id: git-check

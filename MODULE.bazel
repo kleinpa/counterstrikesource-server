@@ -11,29 +11,31 @@ bazel_dep(name = "rules_python", version = "2.3.3")
 bazel_dep(name = "rules_steam")
 git_override(
     module_name = "rules_steam",
-    commit = "1e3cb4e23286575b14e4b074bac7783f40d0be51",
+    commit = "1dd525d504350bd74f61456aea92906f7ea4bd45",
     remote = "https://github.com/lanofdoom/rules_steam.git",
 )
 
-bazel_dep(name = "empty_team_bots", version = "1.1")
+bazel_dep(name = "auth_by_steam_group")
+git_override(
+    module_name = "auth_by_steam_group",
+    commit = "4305a9f73bc0243e26be28853576e2d8bd59118d",
+    remote = "https://github.com/lanofdoom/auth-by-steam-group.git",
+)
+
+bazel_dep(name = "empty_team_bots")
 git_override(
     module_name = "empty_team_bots",
-    commit = "1143c6f02dcaa755b6a2aa540806fb9a421921f1",
+    commit = "515a4560447436e830ebb329c8346c1fb6e4cc46",
     remote = "https://github.com/lanofdoom/empty-team-bots.git",
 )
 
 git_override(
     module_name = "rules_sourcemod",
-    commit = "257d1e9d166591fb768ac6ae480d28f9c5ec328d",
+    commit = "f0573a67a72dbdf366f23233b5d515498aead03c",
     remote = "https://github.com/kleinpa/rules_sourcemod.git",
 )
 
-hl2sdk = use_extension("@rules_sourcemod//hl2sdk:repositories.bzl", "hl2sdk")
-hl2sdk.branch(name = "css")
-use_repo(hl2sdk, "hl2sdk_css")
-
-sourcemod = use_extension("@rules_sourcemod//sourcemod:extensions.bzl", "sourcemod")
-use_repo(sourcemod, "sourcemod_sdk")
+register_toolchains("@rules_sourcemod//linux:all")
 
 # The image is built up from Debian packages rather than pulled from a
 # published base, so nothing lands in it that the game binaries do not link
@@ -54,46 +56,33 @@ use_repo(sourcemod, "sourcemod_sdk")
 # that dedicated_srv.so dlopens for its interactive console -- a dedicated
 # server started without a tty never gets that far.
 #
-# Trixie rather than bookworm, and this is the pin that carries the build's ABI
-# contract now that there is no pinned C++ toolchain.
-#
-# The Metamod and SourceMod addons are compiled by whoever runs the build and
-# then dlopen'd by srcds in here, so this userland has to be at least as new as
-# the glibc and libstdc++ they were compiled against. That direction is the safe
-# one -- both libraries only ever add symbol versions, so an old binary runs
-# against a new library, never the reverse. Valve's own binaries are from 2012
-# and are the extreme case of that.
-#
-# Trixie's glibc 2.41 and libstdc++ 3.4.33 (GCC 14) clear a current build host
-# with room to spare: a Fedora 42 toolchain emits nothing newer than GLIBC_2.38
-# -- its headers redirect sscanf and strtol to the C23 variants added there --
-# and GLIBCXX_3.4.30. Bookworm's glibc 2.36 did not clear it, which is what
-# `Failed to load plugin "addons/metamod/bin/linux64/server"` was.
-#
-# So the maintenance rule is the inverse of the usual one: the snapshot below
-# must move *forward* to stay ahead of the newest host anyone builds on. A host
-# newer than what is pinned here shows up as Metamod or SourceMod failing to
-# load, and `objdump -p` on the built .so files against the versions this ships
-# names the symbol that did it.
+# Debian stable. The Metamod and SourceMod addons are built with
+# rules_sourcemod's hermetic toolchain (registered above) against a glibc 2.31 /
+# GCC 10 sysroot, so they load on any userland at least that new regardless of
+# which distro ran the build (rules_sourcemod's glibc_floor_test enforces it).
+# Valve's own binaries are older still.
 #
 # Snapshot URLs pin the archive to a point in time, so a resolution done today
 # still succeeds after Debian publishes a new point release. Nothing updates
-# the date automatically -- bump the two snapshot URLs below to pick up newer
-# packages.
+# the date automatically -- bump both snapshot URLs below together to pick up
+# newer packages and security fixes.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
 apt.sources_list(
     architectures = ["amd64"],
     components = ["main"],
-    suites = ["trixie"],
+    suites = [
+        "trixie",
+        "trixie-updates",
+    ],
     types = ["deb"],
-    uris = ["https://snapshot.debian.org/archive/debian/20260801T000000Z"],
+    uris = ["https://snapshot.debian.org/archive/debian/20261124T000000Z"],
 )
 apt.sources_list(
     architectures = ["amd64"],
     components = ["main"],
     suites = ["trixie-security"],
     types = ["deb"],
-    uris = ["https://snapshot.debian.org/archive/debian-security/20260801T000000Z"],
+    uris = ["https://snapshot.debian.org/archive/debian-security/20261124T000000Z"],
 )
 apt.install(
     dependency_set = "trixie",
@@ -107,6 +96,7 @@ apt.install(
     suites = [
         "trixie",
         "trixie-security",
+        "trixie-updates",
     ],
 )
 use_repo(apt, "trixie")
@@ -114,22 +104,19 @@ use_repo(apt, "trixie")
 steamapps = use_extension("//:steamapps.bzl", "steamapps_bzlmod")
 use_repo(steamapps, "counterstrikesource_dedicated")
 
-steamapps_launcher = use_extension("//:steamapps_launcher.bzl", "steamapps_launcher_bzlmod")
-use_repo(
-    steamapps_launcher,
-    "steamworks_sdk_redist",
-    "tf2_dedicated",
-)
+# Steamworks SDK Redist, which is where a 64-bit steamclient.so comes from;
+# CS:S only ships a 32-bit one.
+steamapps_steamworks = use_extension("//:steamapps_steamworks.bzl", "steamapps_bzlmod")
+use_repo(steamapps_steamworks, "steamworks_sdk_redist")
+
+# Both steamapps*.bzl files are generated by the //:update_steamapps* targets.
 
 # Compiled from source instead of fetched as prebuilt release tarballs, so
 # these stay reproducible from upstream source rather than a hand-built
 # binary artifact.
-extensions = use_extension("//:addons.bzl", "extensions")
-use_repo(extensions, "auth_by_steam_group", "override_tickrate")
-
-css_plugins = use_extension("//:addons.bzl", "css_plugins")
+addons = use_extension("//:addons.bzl", "addons")
 use_repo(
-    css_plugins,
+    addons,
     "disable_buyzones",
     "disable_radar",
     "disable_round_timer",
@@ -138,6 +125,7 @@ use_repo(
     "gungame",
     "map_settings",
     "max_cash",
+    "override_tickrate",
     "paintball",
     "remove_objectives",
     "respawn",
@@ -169,9 +157,19 @@ use_repo(pip, "counterstrikesource-server_pypi")
 #
 
 # Use HTTP rules
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
 new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
+
+# The 64-bit libsteam_api.so that CS:S's 64-bit engine links against but its
+# depots omit. This copy comes from Valve's Source SDK 2013 repository and is
+# byte-identical to the one in Team Fortress 2's dedicated server.
+http_file(
+    name = "libsteam_api",
+    downloaded_file_path = "libsteam_api.so",
+    sha256 = "c0cc3d2802e5f2463bfa0046c41d2f65a6335baaeefbba6c7dbd5681d5ca7c46",
+    urls = ["https://raw.githubusercontent.com/ValveSoftware/source-sdk-2013/0759e2e8e179d5352d81d0d4aaded72c1704b7a9/src/lib/public/linux64/libsteam_api.so"],
+)
 
 new_git_repository(
     name = "counterstrikesource_maps",

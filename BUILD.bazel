@@ -5,7 +5,6 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("//:mapcycle.bzl", "mapcycle_file")
 load("//:steamapps.bzl", "BUILD_counterstrikesource_dedicated")
-load("//base:defs.bzl", "BASE_LAYERS")
 
 #
 # Counter-Strike: Source Layer
@@ -282,7 +281,10 @@ oci_image(
         "27015/udp",
     ],
     os = "linux",
-    tars = BASE_LAYERS + [
+    # do not sort: layers are stacked in this order and later ones overwrite
+    # earlier ones.
+    tars = [
+        "//base:layers",
         ":counterstrikesource_layer",
         ":launcher_layer",
         ":steam_sdk_layer",

@@ -1,0 +1,64 @@
+"""The image's base system.
+
+There is no base image: the userland is the Debian packages installed by the
+apt.install call in //MODULE.bazel, which explains which ones and how the
+list was derived. This package builds the one file none of them ship;
+defs.bzl lists the layers //:image stacks, packages included.
+"""
+
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_distroless//distroless:defs.bzl", "cacerts")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
+# Without /etc/nsswitch.conf glibc still resolves names -- its built-in default
+# is "dns [!UNAVAIL=return] files" -- but that consults DNS ahead of /etc/hosts,
+# which is the file a container runtime writes the pod's own names into. Three
+# lines to keep /etc/hosts authoritative, as it is on a Debian system.
+write_file(
+    name = "nsswitch_conf",
+    out = "nsswitch.conf",
+    content = [
+        "passwd: files",
+        "group: files",
+        "hosts: files dns",
+        "",
+    ],
+)
+
+pkg_files(
+    name = "nsswitch_files",
+    srcs = [":nsswitch_conf"],
+    prefix = "/etc",
+)
+
+# The merged-/usr symlinks. Debian ships these in `base-files`, which is not
+# installed here because it is otherwise nothing but policy documents and an
+# /etc skeleton -- but trixie's libc6 has completed the merge and puts the
+# dynamic loader at /usr/lib64/ld-linux-x86-64.so.2 only. Valve's binaries name
+# /lib64/ld-linux-x86-64.so.2 as their ELF interpreter, as does anything else
+# built for amd64, and a missing interpreter surfaces as the container failing
+# to start with `exec /opt/game/srcds_linux64 failed: No such file or
+# directory`, which reads like a missing executable rather than a missing loader.
+#
+# Bookworm's libc6 still shipped the compatibility paths itself, so this is new
+# with the move to trixie.
+pkg_tar(
+    name = "base_files_layer",
+    srcs = [":nsswitch_files"],
+    symlinks = {
+        "/lib": "usr/lib",
+        "/lib64": "usr/lib64",
+    },
+    visibility = ["//:__pkg__"],
+)
+
+# Steam's networking code loads its trust store from
+# /etc/ssl/certs/ca-certificates.crt (SSL_CERT_FILE, set on //:image) rather
+# than trusting the host, so without this srcds logs "unable to load trusted
+# SSL root certificates" on every secure connection attempt.
+cacerts(
+    name = "cacerts_layer",
+    package = "@trixie//ca-certificates:data",
+    visibility = ["//:__pkg__"],
+)

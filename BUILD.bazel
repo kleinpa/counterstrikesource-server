@@ -1,9 +1,11 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load", "oci_push")
-load("@rules_pkg//:mappings.bzl", "pkg_files")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("//:mapcycle.bzl", "mapcycle_file")
 load("//:steamapps.bzl", "BUILD_counterstrikesource_dedicated")
+load("//base:defs.bzl", "BASE_LAYERS")
 
 #
 # Counter-Strike: Source Layer
@@ -18,12 +20,55 @@ pkg_tar(
 )
 
 #
+# 64-bit Launcher Layer
+#
+# Valve ships CS:S's 64-bit engine without a 64-bit launcher to start it; where
+# srcds_linux64 comes from and why is explained in steamapps_launcher.bzl.
+
+pkg_tar(
+    name = "launcher_layer",
+    srcs = ["@tf2_dedicated//:files"],
+    package_dir = "/opt/game",
+    # The 64-bit launcher asks the engine for its modules under their plain
+    # names, while the depot ships them with the dedicated-server "_srv"
+    # suffix the 32-bit launcher expects. Aliasing one to the other is what
+    # lets the two halves meet.
+    symlinks = {
+        "/opt/game/bin/linux64/datacache.so": "datacache_srv.so",
+        "/opt/game/bin/linux64/dedicated.so": "dedicated_srv.so",
+        "/opt/game/bin/linux64/engine.so": "engine_srv.so",
+        "/opt/game/bin/linux64/libtier0.so": "libtier0_srv.so",
+        "/opt/game/bin/linux64/libvstdlib.so": "libvstdlib_srv.so",
+        "/opt/game/bin/linux64/materialsystem.so": "materialsystem_srv.so",
+        "/opt/game/bin/linux64/replay.so": "replay_srv.so",
+        "/opt/game/bin/linux64/scenefilecache.so": "scenefilecache_srv.so",
+        "/opt/game/bin/linux64/shaderapiempty.so": "shaderapiempty_srv.so",
+        "/opt/game/bin/linux64/soundemittersystem.so": "soundemittersystem_srv.so",
+        "/opt/game/bin/linux64/studiorender.so": "studiorender_srv.so",
+        "/opt/game/bin/linux64/vphysics.so": "vphysics_srv.so",
+        "/opt/game/bin/linux64/vscript.so": "vscript_srv.so",
+    },
+)
+
+# The Steam client library the engine uses to register the server with Valve.
+# CS:S ships only a 32-bit one, so both come from the Steamworks redistributable
+# instead, which keeps the pair pinned to a single manifest.
+pkg_tar(
+    name = "steam_sdk_layer",
+    srcs = ["@steamworks_sdk_redist//:files"],
+    package_dir = "/opt/game/steamsdk",
+)
+
+#
 # Maps Layer
 #
 
 mapcycle_file(
     name = "mapcycle",
-    map_archive = "@maps//file",
+    map_archives = [
+        ":counterstrikesource_layer",
+        "@counterstrikesource_maps//:all_maps",
+    ],
 )
 
 pkg_files(
@@ -36,28 +81,37 @@ pkg_tar(
     name = "maps_layer",
     srcs = [":mapcycle_files"],
     package_dir = "/opt/game/cstrike",
-    deps = ["@maps//file"],
-)
-
-#
-# MetaMod Layer
-#
-
-pkg_tar(
-    name = "metamod_layer",
-    package_dir = "/opt/game/cstrike",
-    deps = ["@metamod_linux//file"],
+    deps = ["@counterstrikesource_maps//:all_maps"],
 )
 
 #
 # SourceMod Layer
 #
+# rules_sourcemod fetches and builds the css branch for its own use (see the
+# `hl2sdk` extension usage in its MODULE.bazel), so //sourcemod:sourcemod_css
+# is a ready-made preset: loader, logic, core and five bundled SourceMod
+# extensions, static data files, and Metamod (loader, CSS core, VDF, since
+# SourceMod cannot run without it) -- all without this repo naming
+# @hl2sdk_css or @metamod_source itself for it.
+#
+# Bundled SourcePawn plugins are not part of that preset -- which of
+# SourceMod's ~24 stock plugins a server wants is a per-deployment choice, so
+# each one is pulled in explicitly from @sourcemod_sdk instead of getting all
+# of them by default. This selection matches what upstream's own
+# PackageScript ships active: basic admin commands, nextmap voting, and map
+# nomination/rock-the-vote.
 
 pkg_tar(
     name = "sourcemod_layer",
-    empty_dirs = ["/opt/game/cstrike/addons/sourcemod/configs"],
+    srcs = [
+        "@rules_sourcemod//sourcemod:sourcemod_cstrike",
+        "@sourcemod_sdk//:plugin_basecommands",
+        "@sourcemod_sdk//:plugin_mapchooser",
+        "@sourcemod_sdk//:plugin_nextmap",
+        "@sourcemod_sdk//:plugin_nominations",
+        "@sourcemod_sdk//:plugin_rockthevote",
+    ],
     package_dir = "/opt/game/cstrike",
-    deps = ["@sourcemod_linux//file"],
 )
 
 #
@@ -66,8 +120,11 @@ pkg_tar(
 
 pkg_tar(
     name = "authorization_layer",
+    srcs = [
+        "@auth_by_steam_group//:extension",
+        "@auth_by_steam_group//:plugin",
+    ],
     package_dir = "/opt/game/cstrike",
-    deps = ["@auth_by_steam_group_linux//file"],
 )
 
 #
@@ -76,40 +133,90 @@ pkg_tar(
 
 pkg_tar(
     name = "plugins_layer",
-    package_dir = "/opt/game/cstrike",
-    deps = [
-        "@disable_buyzones//file",
-        "@disable_radar//file",
-        "@disable_round_timer//file",
-        "@ffa_spawns//file",
-        "@free_for_all//file",
-        "@gungame//file",
-        "@map_settings//file",
-        "@max_cash//file",
-        "@paintball//file",
-        "@remove_objectives//file",
-        "@respawn//file",
-        "@spawn_protection//file",
+    # Compiled extensions and plugins carry their own PackageFilesInfo, so
+    # pkg_tar places them without any mapping here.
+    srcs = [
+        "@disable_buyzones//:plugin",
+        "@disable_radar//:plugin",
+        "@disable_round_timer//:plugin",
+        "@empty_team_bots//:empty_team_bots",
+        "@ffa_spawns//:plugin",
+        "@free_for_all//:plugin",
+        "@gungame//:plugin",
+        "@map_settings//:plugin",
+        "@max_cash//:plugin",
+        "@override_tickrate//:extension",
+        "@paintball//:plugin",
+        "@remove_objectives//:plugin",
+        "@respawn//:plugin",
+        "@spawn_protection//:plugin",
     ],
+    package_dir = "/opt/game/cstrike",
 )
 
 #
 # Config Layer
 #
 
+# config/ mirrors the layout of the cstrike/ game directory, so it is unpacked
+# at that root rather than under cfg/: it carries files for cstrike/cfg/,
+# cstrike/addons/ and cstrike/ itself.
 pkg_files(
     name = "config_files",
     srcs = glob(["config/**"]),
     strip_prefix = "config",
 )
 
+pkg_files(
+    name = "server_cfg_file",
+    srcs = ["server.cfg"],
+    prefix = "cfg",
+)
+
+# A missing maplists.cfg crashes SourceMod's map list handling on startup, so
+# an empty one is shipped to stand in for it.
+write_file(
+    name = "sourcemod_maplists_workaround",
+    out = "maplists.cfg",
+)
+
+pkg_files(
+    name = "sourcemod_maplists_workaround_files",
+    srcs = [":sourcemod_maplists_workaround"],
+    prefix = "addons/sourcemod/configs",
+)
+
+# SourceMod writes these from a bundled template the first time it finds them
+# missing, clobbering the mp_mapchooser_time/rtv convars server.cfg already
+# set. Shipping them empty (but present) heads that off.
+write_file(
+    name = "sourcemod_mapchooser_workaround",
+    out = "mapchooser.cfg",
+)
+
+write_file(
+    name = "sourcemod_rtv_workaround",
+    out = "rtv.cfg",
+)
+
+pkg_files(
+    name = "sourcemod_cfg_workaround_files",
+    srcs = [
+        ":sourcemod_mapchooser_workaround",
+        ":sourcemod_rtv_workaround",
+    ],
+    prefix = "cfg/sourcemod",
+)
+
 pkg_tar(
     name = "config_layer",
     srcs = [
         ":config_files",
-        ":server.cfg",
+        ":server_cfg_file",
+        ":sourcemod_cfg_workaround_files",
+        ":sourcemod_maplists_workaround_files",
     ],
-    package_dir = "/opt/game/cstrike/cfg",
+    package_dir = "/opt/game/cstrike",
 )
 
 #
@@ -117,46 +224,84 @@ pkg_tar(
 #
 
 pkg_tar(
-    name = "entrypoint_layer",
+    name = "runtime_layer",
     package_dir = "/",
-    symlinks = {"/root/.steam/sdk32/steamclient.so": "/opt/game/bin/steamclient.so"},
+    # Where the engine goes looking for the Steam client library.
+    symlinks = {
+        "/root/.steam/sdk32/steamclient.so": "/opt/game/steamsdk/steamclient.so",
+        "/root/.steam/sdk64/steamclient.so": "/opt/game/steamsdk/linux64/steamclient.so",
+    },
 )
 
+# There is no `base`: the image is assembled from the bottom up out of //base
+# and the layers below, so the architecture and os the manifest would otherwise
+# inherit have to be stated. Only amd64 is buildable anyway -- Valve ships no
+# other dedicated server.
+#
+# Every tar becomes its own layer, so the multi-gigabyte game content is
+# addressed separately from the addons and is neither rebuilt nor re-pushed when
+# one of them is bumped.
+#
+# srcds_linux is the entrypoint rather than srcds_run: the wrapper's restart and
+# auto-update logic fights with the container runtime, which is the thing that
+# should be deciding when to restart us.
+#
+# The split between entrypoint and cmd is the configuration surface. Everything
+# the image insists on lives in the entrypoint; everything a deployment is
+# expected to override lives in cmd, which is what Kubernetes replaces when a
+# pod spec sets `args:`. Convar values containing spaces have to carry their own
+# quotes -- the engine re-joins argv and tokenizes it itself -- so a hostname is
+# passed as `+hostname` `"Server Name"`, quotes included.
 oci_image(
-    name = "base",
-    base = "@counterstrikesource-server-steamcmd",
+    name = "image",
+    architecture = "amd64",
+    cmd = [
+        "+map",
+        "de_dust2",
+    ],
     entrypoint = [
-        "/opt/game/srcds_linux",
+        "/opt/game/srcds_linux64",
         "-game",
         "cstrike",
+        "-strictbindport",
+        "-usercon",
         "+ip",
         "0.0.0.0",
     ],
-    env = {"LD_LIBRARY_PATH": "/opt/game:/opt/game/bin"},
-    tars = [
-        ":counterstrikesource_layer",
+    env = {
+        # The engine reads $HOME to find .steam/sdk64/steamclient.so, which
+        # runtime_layer symlinks into place. This came from the steamcmd image
+        # before, and losing it takes the Steam client library with it.
+        "HOME": "/root",
+        "LD_LIBRARY_PATH": "/opt/game:/opt/game/bin/linux64",
+        # Steam's networking code trusts nothing without this -- see
+        # //base:cacerts_layer.
+        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+    },
+    exposed_ports = [
+        "27015/udp",
     ],
-    workdir = "/opt/game",
-)
-
-oci_image(
-    name = "image",
-    base = ":base",
-    tars = [
+    os = "linux",
+    tars = BASE_LAYERS + [
+        ":counterstrikesource_layer",
+        ":launcher_layer",
+        ":steam_sdk_layer",
         ":maps_layer",
-        ":metamod_layer",
         ":sourcemod_layer",
-        # ":authorization_layer",
+        ":authorization_layer",
         ":plugins_layer",
         ":config_layer",
-        ":entrypoint_layer",
+        ":runtime_layer",
     ],
+    visibility = ["//visibility:public"],
+    workdir = "/opt/game",
 )
 
 oci_load(
     name = "image_tarball",
     image = ":image",
     repo_tags = ["counterstrikesource-server:bazel"],
+    visibility = ["//tests:__pkg__"],
 )
 
 oci_push(

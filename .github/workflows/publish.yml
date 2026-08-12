@@ -20,6 +20,9 @@ jobs:
           disk-cache: ${{ github.workflow }}-build
           repository-cache: true
 
+      - name: Test image
+        run: bazel test -c opt //...
+
       - name: Log into registry
         uses: docker/login-action@v3
         with:

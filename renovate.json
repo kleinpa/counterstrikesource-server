@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>kleinpa/renovate-config"],
-  "automerge": true,
-  "automergeType": "branch",
-  "dependencyDashboard": true
+  "postUpgradeTasks": {
+    "commands": ["bazelisk mod deps"],
+    "executionMode": "branch"
+  }
 }

@@ -22,21 +22,51 @@ Run ``docker pull ghcr.io/lanofdoom/counterstrikesource-server:latest``
 * MetaMod:Source
 * SourceMod
 
-# Environmental Variables
-``CSS_HOSTNAME`` The name of the server as listed in Valve's server browser.
+# Configuration
+There is no entrypoint script and no environment variables. The image runs
+``srcds_linux`` directly, so it is configured the same way the binary is: with
+command line arguments and with config files.
 
-``CSS_PASSWORD`` The password users must enter in order to join the server.
+The image's ``entrypoint`` carries the arguments the image insists on
+(``-game cstrike``, ``-strictbindport``, ``-usercon``, ``+ip 0.0.0.0``). Its
+``cmd`` carries the defaults a deployment is expected to replace, which is what
+Kubernetes substitutes when a pod spec sets ``args:``:
 
-``CSS_MAP`` The first map to run on the server. ``de_dust2`` by default.
+```yaml
+args: ["+map", "de_nuke", "+hostname", "\"LAN of DOOM\"", "+sv_password", "hunter2"]
+```
 
-``CSS_MOTD`` The MOTD to use for the server.
+Convar values containing spaces must carry their own quotes, as above: the
+engine re-joins ``argv`` into one string and tokenizes it itself, so shell or
+YAML quoting alone gets the value as far as ``argv`` and no further.
 
-``CSS_PORT`` The port to use for the server. ``27015`` by default.
+Config files are read from ``/opt/game/cstrike/cfg``; mount a ConfigMap or
+Secret over a file there to override it, e.g. ``server.cfg``, or
+``/opt/game/cstrike/motd.txt`` for the MOTD.
 
-``RCON_PASSWORD`` The rcon password for the server.
+# Development
+Build the image and load it into the local Docker daemon:
 
-``STEAM_GROUP_ID`` The Steam group to use for the allowlist of users joining the
-server.
+```sh
+bazel run //:image_tarball
+```
 
-``STEAM_API_KEY`` The [Steam API key](https://steamcommunity.com/dev/apikey) to
-use for the group membership checks with the Steam's Web API.
+Run the test suite. The tests start the real image in a container and query it
+over the same A2S protocol the Steam server browser uses, so they need a working
+Docker daemon:
+
+```sh
+bazel test //...
+```
+
+The image has no base image: its Debian userland is assembled in ``base/`` from
+the packages installed by the ``apt.install`` call in ``MODULE.bazel``, which
+pins the Debian archive to a snapshot date via the accompanying
+``apt.sources_list`` calls. Nothing bumps that date automatically, so picking
+up newer packages means editing the snapshot URLs in ``MODULE.bazel``.
+
+There is no pinned C++ toolchain: the MetaMod and SourceMod addons are built
+with whatever toolchain the build already has, and it is the image's userland
+that is kept new enough to load them rather than the compiler that is kept old
+enough for the image. The comment above the ``apt`` calls in ``MODULE.bazel``
+explains the constraint that puts on the snapshot date.

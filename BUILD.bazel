@@ -5,7 +5,6 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 load("//:mapcycle.bzl", "mapcycle_file")
 load("//:steamapps.bzl", "BUILD_counterstrikesource_dedicated")
-load("//base:defs.bzl", "BASE_LAYERS")
 
 #
 # Counter-Strike: Source Layer
@@ -23,7 +22,7 @@ pkg_tar(
 # 64-bit Launcher Layer
 #
 # Valve ships CS:S's 64-bit engine without a 64-bit launcher to start it; where
-# srcds_linux64 comes from and why is explained in steamapps_launcher.bzl.
+# srcds_linux64 comes from and why is explained in MODULE.bazel.
 
 pkg_tar(
     name = "launcher_layer",
@@ -87,29 +86,19 @@ pkg_tar(
 #
 # SourceMod Layer
 #
-# rules_sourcemod fetches and builds the css branch for its own use (see the
-# `hl2sdk` extension usage in its MODULE.bazel), so //sourcemod:sourcemod_css
-# is a ready-made preset: loader, logic, core and five bundled SourceMod
-# extensions, static data files, and Metamod (loader, CSS core, VDF, since
-# SourceMod cannot run without it) -- all without this repo naming
-# @hl2sdk_css or @metamod_source itself for it.
-#
-# Bundled SourcePawn plugins are not part of that preset -- which of
-# SourceMod's ~24 stock plugins a server wants is a per-deployment choice, so
-# each one is pulled in explicitly from @sourcemod_sdk instead of getting all
-# of them by default. This selection matches what upstream's own
-# PackageScript ships active: basic admin commands, nextmap voting, and map
-# nomination/rock-the-vote.
+# //sourcemod:sourcemod_cstrike bundles SourceMod (loader, logic, core, and
+# stock extensions) together with Metamod (loader, CSS core, and engine VDF).
+# Stock SourcePawn plugins are opt-in per deployment via //sourcemod:plugin_*.
 
 pkg_tar(
     name = "sourcemod_layer",
     srcs = [
+        "@rules_sourcemod//sourcemod:plugin_basecommands",
+        "@rules_sourcemod//sourcemod:plugin_mapchooser",
+        "@rules_sourcemod//sourcemod:plugin_nextmap",
+        "@rules_sourcemod//sourcemod:plugin_nominations",
+        "@rules_sourcemod//sourcemod:plugin_rockthevote",
         "@rules_sourcemod//sourcemod:sourcemod_cstrike",
-        "@sourcemod_sdk//:plugin_basecommands",
-        "@sourcemod_sdk//:plugin_mapchooser",
-        "@sourcemod_sdk//:plugin_nextmap",
-        "@sourcemod_sdk//:plugin_nominations",
-        "@sourcemod_sdk//:plugin_rockthevote",
     ],
     package_dir = "/opt/game/cstrike",
 )
@@ -120,10 +109,7 @@ pkg_tar(
 
 pkg_tar(
     name = "authorization_layer",
-    srcs = [
-        "@auth_by_steam_group//:extension",
-        "@auth_by_steam_group//:plugin",
-    ],
+    srcs = ["@auth_by_steam_group"],
     package_dir = "/opt/game/cstrike",
 )
 
@@ -139,7 +125,7 @@ pkg_tar(
         "@disable_buyzones//:plugin",
         "@disable_radar//:plugin",
         "@disable_round_timer//:plugin",
-        "@empty_team_bots//:empty_team_bots",
+        "@empty_team_bots",
         "@ffa_spawns//:plugin",
         "@free_for_all//:plugin",
         "@gungame//:plugin",
@@ -173,19 +159,6 @@ pkg_files(
     prefix = "cfg",
 )
 
-# A missing maplists.cfg crashes SourceMod's map list handling on startup, so
-# an empty one is shipped to stand in for it.
-write_file(
-    name = "sourcemod_maplists_workaround",
-    out = "maplists.cfg",
-)
-
-pkg_files(
-    name = "sourcemod_maplists_workaround_files",
-    srcs = [":sourcemod_maplists_workaround"],
-    prefix = "addons/sourcemod/configs",
-)
-
 # SourceMod writes these from a bundled template the first time it finds them
 # missing, clobbering the mp_mapchooser_time/rtv convars server.cfg already
 # set. Shipping them empty (but present) heads that off.
@@ -214,7 +187,6 @@ pkg_tar(
         ":config_files",
         ":server_cfg_file",
         ":sourcemod_cfg_workaround_files",
-        ":sourcemod_maplists_workaround_files",
     ],
     package_dir = "/opt/game/cstrike",
 )
@@ -282,7 +254,10 @@ oci_image(
         "27015/udp",
     ],
     os = "linux",
-    tars = BASE_LAYERS + [
+    # do not sort: layers are stacked in this order and later ones overwrite
+    # earlier ones.
+    tars = [
+        "//base:layers",
         ":counterstrikesource_layer",
         ":launcher_layer",
         ":steam_sdk_layer",

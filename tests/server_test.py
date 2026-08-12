@@ -218,6 +218,18 @@ class AddonTest(unittest.TestCase):
                 self.assertIn(f"Loaded plugin {plugin} successfully",
                               server_logs, f"{plugin} did not load")
 
+    def test_override_tickrate_loads(self):
+        """-tickrate takes effect, which needs the override_tickrate extension.
+
+        No plugin requires that extension, so nothing else here notices when
+        SourceMod does not load it.
+        """
+        with DockerContainer(load_image()).with_kwargs(init=True, tty=True).with_command(
+            ["-tickrate", "100", "+map",
+             "de_dust2"]).with_exposed_ports(f"{_GAME_PORT}/udp") as container:
+            wait_for_a2s(container)
+            self.assertIn("setting tickrate to 100.0", logs(container))
+
 
 def main() -> None:
     """Runs the tests, honouring Bazel's --test_filter.

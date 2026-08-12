@@ -11,7 +11,7 @@ bazel_dep(name = "rules_python", version = "2.3.3")
 bazel_dep(name = "rules_steam")
 git_override(
     module_name = "rules_steam",
-    commit = "1e3cb4e23286575b14e4b074bac7783f40d0be51",
+    commit = "60ca5cdb17d6418430204f6b4ec75b37bfcbb097",
     remote = "https://github.com/lanofdoom/rules_steam.git",
 )
 
@@ -24,7 +24,7 @@ git_override(
 
 git_override(
     module_name = "rules_sourcemod",
-    commit = "257d1e9d166591fb768ac6ae480d28f9c5ec328d",
+    commit = "d6d18d31b42a00ab1e2f4333a51ebbb8674389ae",
     remote = "https://github.com/kleinpa/rules_sourcemod.git",
 )
 
@@ -54,8 +54,8 @@ use_repo(sourcemod, "sourcemod_sdk")
 # that dedicated_srv.so dlopens for its interactive console -- a dedicated
 # server started without a tty never gets that far.
 #
-# Trixie rather than bookworm, and this is the pin that carries the build's ABI
-# contract now that there is no pinned C++ toolchain.
+# Forky (testing) rather than a stable release, and this is the pin that
+# carries the build's ABI contract now that there is no pinned C++ toolchain.
 #
 # The Metamod and SourceMod addons are compiled by whoever runs the build and
 # then dlopen'd by srcds in here, so this userland has to be at least as new as
@@ -64,39 +64,35 @@ use_repo(sourcemod, "sourcemod_sdk")
 # against a new library, never the reverse. Valve's own binaries are from 2012
 # and are the extreme case of that.
 #
-# Trixie's glibc 2.41 and libstdc++ 3.4.33 (GCC 14) clear a current build host
-# with room to spare: a Fedora 42 toolchain emits nothing newer than GLIBC_2.38
-# -- its headers redirect sscanf and strtol to the C23 variants added there --
-# and GLIBCXX_3.4.30. Bookworm's glibc 2.36 did not clear it, which is what
-# `Failed to load plugin "addons/metamod/bin/linux64/server"` was.
+# Forky's glibc 2.43 and libstdc++ from GCC 16 match a Fedora 44 build host
+# exactly. Trixie's glibc 2.41 did not clear it: glibc 2.43 moved the
+# single-precision math entry points (acosf, asinf, atan2f, log10f, sqrtf)
+# to a new GLIBC_2.43 symbol version, so anything linked on a 2.43 host asks
+# for that version and trixie's loader refuses it -- which is what
+# `Failed to load plugin "addons/metamod/bin/linux64/server"` was. Bookworm's
+# glibc 2.36 had failed the same way one host generation earlier.
 #
 # So the maintenance rule is the inverse of the usual one: the snapshot below
 # must move *forward* to stay ahead of the newest host anyone builds on. A host
 # newer than what is pinned here shows up as Metamod or SourceMod failing to
-# load, and `objdump -p` on the built .so files against the versions this ships
+# load, and `objdump -T` on the built .so files against the versions this ships
 # names the symbol that did it.
 #
 # Snapshot URLs pin the archive to a point in time, so a resolution done today
 # still succeeds after Debian publishes a new point release. Nothing updates
-# the date automatically -- bump the two snapshot URLs below to pick up newer
-# packages.
+# the date automatically -- bump the snapshot URL below to pick up newer
+# packages. There is no separate security suite for testing at
+# snapshot.debian.org; its security fixes land in the main suite.
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
 apt.sources_list(
     architectures = ["amd64"],
     components = ["main"],
-    suites = ["trixie"],
+    suites = ["forky"],
     types = ["deb"],
-    uris = ["https://snapshot.debian.org/archive/debian/20260801T000000Z"],
-)
-apt.sources_list(
-    architectures = ["amd64"],
-    components = ["main"],
-    suites = ["trixie-security"],
-    types = ["deb"],
-    uris = ["https://snapshot.debian.org/archive/debian-security/20260801T000000Z"],
+    uris = ["https://snapshot.debian.org/archive/debian/20260901T000000Z"],
 )
 apt.install(
-    dependency_set = "trixie",
+    dependency_set = "forky",
     packages = [
         "ca-certificates",
         "libc6",
@@ -104,22 +100,28 @@ apt.install(
         "libstdc++6",
         "zlib1g",
     ],
-    suites = [
-        "trixie",
-        "trixie-security",
-    ],
+    suites = ["forky"],
 )
-use_repo(apt, "trixie")
+use_repo(apt, "forky")
 
 steamapps = use_extension("//:steamapps.bzl", "steamapps_bzlmod")
 use_repo(steamapps, "counterstrikesource_dedicated")
 
-steamapps_launcher = use_extension("//:steamapps_launcher.bzl", "steamapps_launcher_bzlmod")
-use_repo(
-    steamapps_launcher,
-    "steamworks_sdk_redist",
-    "tf2_dedicated",
-)
+# Counter-Strike: Source ships a 64-bit engine (bin/linux64, and a 64-bit
+# cstrike/bin/linux64/server_srv.so) but Valve never shipped the 64-bit
+# launcher for it: depot 232336 contains only a 32-bit srcds_linux. The
+# launcher is engine-generic, so it is taken from Team Fortress 2's dedicated
+# server, which does ship one, along with the 64-bit libsteam_api.so that CS:S
+# also omits.
+steamapps_tf2 = use_extension("//:steamapps_tf2.bzl", "steamapps_bzlmod")
+use_repo(steamapps_tf2, "tf2_dedicated")
+
+# Steamworks SDK Redist, which is where a 64-bit steamclient.so comes from;
+# CS:S only ships a 32-bit one.
+steamapps_steamworks = use_extension("//:steamapps_steamworks.bzl", "steamapps_bzlmod")
+use_repo(steamapps_steamworks, "steamworks_sdk_redist")
+
+# All three steamapps*.bzl files are generated by update-steamapps.sh.
 
 # Compiled from source instead of fetched as prebuilt release tarballs, so
 # these stay reproducible from upstream source rather than a hand-built

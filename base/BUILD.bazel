@@ -3,13 +3,28 @@
 There is no base image: the userland is the Debian packages installed by the
 apt.install call in //MODULE.bazel, which explains which ones and how the
 list was derived. This package builds the one file none of them ship;
-defs.bzl lists the layers //:image stacks, packages included.
+:layers lists the layers //:image stacks, packages included.
 """
 
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_distroless//distroless:defs.bzl", "cacerts")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
+filegroup(
+    name = "layers",
+    # do not sort: layers are stacked in this order and later ones overwrite
+    # earlier ones, so this list is order-dependent, not alphabetical.
+    srcs = [
+        "@forky//libc6:data",
+        "@forky//libgcc-s1:data",
+        "@forky//libstdc++6:data",
+        "@forky//zlib1g:data",
+        ":base_files_layer",
+        ":cacerts_layer",
+    ],
+    visibility = ["//:__pkg__"],
+)
 
 # Without /etc/nsswitch.conf glibc still resolves names -- its built-in default
 # is "dns [!UNAVAIL=return] files" -- but that consults DNS ahead of /etc/hosts,
@@ -34,7 +49,7 @@ pkg_files(
 
 # The merged-/usr symlinks. Debian ships these in `base-files`, which is not
 # installed here because it is otherwise nothing but policy documents and an
-# /etc skeleton -- but trixie's libc6 has completed the merge and puts the
+# /etc skeleton -- but libc6 since trixie has completed the merge and puts the
 # dynamic loader at /usr/lib64/ld-linux-x86-64.so.2 only. Valve's binaries name
 # /lib64/ld-linux-x86-64.so.2 as their ELF interpreter, as does anything else
 # built for amd64, and a missing interpreter surfaces as the container failing
@@ -59,6 +74,6 @@ pkg_tar(
 # SSL root certificates" on every secure connection attempt.
 cacerts(
     name = "cacerts_layer",
-    package = "@trixie//ca-certificates:data",
+    package = "@forky//ca-certificates:data",
     visibility = ["//:__pkg__"],
 )

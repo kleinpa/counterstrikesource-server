@@ -1,1 +1,1 @@
-test motd
+https://github.com/kleinpa/counterstrikesource-server

@@ -17,7 +17,7 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "counterstrikesource-server-steamcmd",
     image = "ghcr.io/steamcmd/steamcmd:debian-bookworm",
-    digest = "sha256:60ab5f176993271d86120d2eef7ba5a91927b8f3f5cf770d66123db0feb526da",
+    digest = "sha256:5d2341d2e7aeff50cc9776bb3a2507016ff66a767c111531e8560803bb5e69a6",
 )
 use_repo(oci, "counterstrikesource-server-steamcmd")
 

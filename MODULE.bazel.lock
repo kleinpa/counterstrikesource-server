@@ -454,6 +454,28 @@
         }
       }
     },
+    "@@pybind11_bazel+//:internal_configure.bzl%internal_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "NRXra7941UfmNUyIxnLt82V5hULluVGL2nBsijTl4j4=",
+        "usagesDigest": "D1r3lfzMuUBFxgG8V6o0bQTLMk3GkaGOaPzw53wrwyw=",
+        "recordedInputs": [
+          "REPO_MAPPING:pybind11_bazel+,bazel_tools bazel_tools",
+          "FILE:@@pybind11_bazel+//MODULE.bazel e6f4c20442eaa7c90d7190d8dc539d0ab422f95c65a57cc59562170c58ae3d34"
+        ],
+        "generatedRepoSpecs": {
+          "pybind11": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@pybind11_bazel+//:pybind11-BUILD.bazel",
+              "strip_prefix": "pybind11-2.12.0",
+              "urls": [
+                "https://github.com/pybind/pybind11/archive/v2.12.0.zip"
+              ]
+            }
+          }
+        }
+      }
+    },
     "@@rules_dotnet+//dotnet:extensions.bzl%dotnet": {
       "general": {
         "bzlTransitiveDigest": "Xc5yZNHGGYkICbCqyHpLoWDUwtfzxzvK6ftc5Mby6G0=",
@@ -813,6 +835,44 @@
           "sourcemod_sdk": {
             "repoRuleId": "@@rules_sourcemod+//sourcemod:repositories.bzl%sourcemod_sdk_repository",
             "attributes": {}
+          }
+        }
+      }
+    },
+    "@@rules_steam+//examples:steamapps.bzl%steamapps_bzlmod": {
+      "general": {
+        "bzlTransitiveDigest": "/WC+Y+3LQ0NGTFXjo+QjN08b2C8E80CNoFXl/VMFt3U=",
+        "usagesDigest": "isr7MUkdYvjmTnD5Fuvk+tfcDetu3wo42BqrBuA0CME=",
+        "recordedInputs": [
+          "REPO_MAPPING:rules_steam+,rules_steam rules_steam+"
+        ],
+        "generatedRepoSpecs": {
+          "depot1006": {
+            "repoRuleId": "@@rules_steam+//:steam.bzl%_steam_depot",
+            "attributes": {
+              "app": "996560",
+              "depot": "1006",
+              "manifest": "6403079453713498174",
+              "files": []
+            }
+          },
+          "depot996562": {
+            "repoRuleId": "@@rules_steam+//:steam.bzl%_steam_depot",
+            "attributes": {
+              "app": "996560",
+              "depot": "996562",
+              "manifest": "6949866359015383229",
+              "files": []
+            }
+          },
+          "scpsl_dedicated_server": {
+            "repoRuleId": "@@rules_steam+//:steam.bzl%_steam_repo",
+            "attributes": {
+              "depot_repos_files": [
+                "@@rules_steam++steamapps_bzlmod+depot1006//:depot1006",
+                "@@rules_steam++steamapps_bzlmod+depot996562//:depot996562"
+              ]
+            }
           }
         }
       }

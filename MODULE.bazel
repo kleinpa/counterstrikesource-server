@@ -17,7 +17,7 @@ git_override(
 
 git_override(
     module_name = "rules_sourcemod",
-    commit = "b27febbc2a37d795eec80bc6fe5a8e62868d9b0d",
+    commit = "d6b465d331052904cfc673b52ed098ef385c73f0",
     remote = "https://github.com/kleinpa/rules_sourcemod.git",
 )
 

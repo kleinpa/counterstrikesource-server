@@ -3,5 +3,17 @@
   "extends": ["github>kleinpa/renovate-config"],
   "automerge": true,
   "automergeType": "branch",
-  "dependencyDashboard": true
+  "dependencyDashboard": true,
+  "postUpgradeTasks": {
+    "commands": ["bazelisk mod deps"],
+    "executionMode": "branch"
+  },
+  "packageRules": [
+    {
+      "description": "Group all build-tool dependencies into a single monthly update",
+      "matchPackageNames": ["!/lanofdoom//"],
+      "groupName": "build-tools",
+      "schedule": ["on the first day of the month"]
+    }
+  ]
 }

@@ -14,6 +14,9 @@ jobs:
           app-id: "${{ vars.RENOVATE_APP_ID }}"
           private-key: "${{ secrets.RENOVATE_APP_PRIVATE_KEY }}"
       - uses: actions/checkout@v6
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
       - uses: renovatebot/github-action@v44.0.5
         with:
           token: "${{ steps.app-token.outputs.token }}"

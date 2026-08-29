@@ -147,8 +147,8 @@
     "https://bcr.bazel.build/modules/rules_cc/0.2.8/MODULE.bazel": "f1df20f0bf22c28192a794f29b501ee2018fa37a3862a1a2132ae2940a23a642",
     "https://bcr.bazel.build/modules/rules_distroless/0.9.4/MODULE.bazel": "e098aab7f99a64d254bd4f425db6d7fb0818e2362f028d1672964ee130615567",
     "https://bcr.bazel.build/modules/rules_distroless/0.9.4/source.json": "f4cc35c677da04b354d652a4b5835a7ad1dbd3d53043fbce163a050ae2af85d1",
-    "https://bcr.bazel.build/modules/rules_dotnet/0.22.1/MODULE.bazel": "0faeb8532d178e34ad0e461d7ec1a9d08f3e5c6c81b8791d5fff5aee356adcb2",
-    "https://bcr.bazel.build/modules/rules_dotnet/0.22.1/source.json": "a1d2ad8cd886f716d7707925f3628178830c7df644a47fce711732d9e03fde0c",
+    "https://bcr.bazel.build/modules/rules_dotnet/0.22.2/MODULE.bazel": "ba1ef25468b67f7bace84064ac50a8380d9140e979a09b0548e7b29918b953be",
+    "https://bcr.bazel.build/modules/rules_dotnet/0.22.2/source.json": "2d493ac6964cbfdd58e2b9ae9512459cecfb85d52c344e96319e1aa04143d794",
     "https://bcr.bazel.build/modules/rules_foreign_cc/0.9.0/MODULE.bazel": "c9e8c682bf75b0e7c704166d79b599f93b72cfca5ad7477df596947891feeef6",
     "https://bcr.bazel.build/modules/rules_fuzzing/0.5.2/MODULE.bazel": "40c97d1144356f52905566c55811f13b299453a14ac7769dfba2ac38192337a8",
     "https://bcr.bazel.build/modules/rules_java/4.0.0/MODULE.bazel": "5a78a7ae82cd1a33cef56dc578c7d2a46ed0dca12643ee45edbb8417899e6f74",
@@ -831,8 +831,8 @@
     },
     "@@rules_dotnet+//dotnet:extensions.bzl%dotnet": {
       "general": {
-        "bzlTransitiveDigest": "Xc5yZNHGGYkICbCqyHpLoWDUwtfzxzvK6ftc5Mby6G0=",
-        "usagesDigest": "ub+1+1yB2D2AazO4k+p7J8lh0ubmVmhQfpENnzFVowQ=",
+        "bzlTransitiveDigest": "uEHkcHo+qz0mZXMqN4Q7wBRkPontx/Bonzh6vyzfwyM=",
+        "usagesDigest": "n1qokqzQWTS5jUb1RiKz+XZluP691rPzPtmcGS8CoEQ=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "dotnet_x86_64-apple-darwin": {

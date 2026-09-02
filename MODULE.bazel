@@ -18,7 +18,7 @@ git_override(
 bazel_dep(name = "empty_team_bots", version = "1.1")
 git_override(
     module_name = "empty_team_bots",
-    commit = "328617feb17869163ae2d588ec85872432d59375",
+    commit = "2a561ab816d844c5452ba588904dedff37caf478",
     remote = "https://github.com/lanofdoom/empty-team-bots.git",
 )
 

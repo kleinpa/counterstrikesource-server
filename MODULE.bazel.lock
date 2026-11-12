@@ -1080,7 +1080,7 @@
     },
     "@@rules_steam+//examples:steamapps.bzl%steamapps_bzlmod": {
       "general": {
-        "bzlTransitiveDigest": "/s/wG/wGCoLhDX7pbAV7NbxSD+eqS/CDZJes+zSAW0Q=",
+        "bzlTransitiveDigest": "uqnaywK73Ho9NI2VOoMaYJipq6POUEeJfXf9oKi802I=",
         "usagesDigest": "isr7MUkdYvjmTnD5Fuvk+tfcDetu3wo42BqrBuA0CME=",
         "recordedInputs": [
           "REPO_MAPPING:rules_steam+,rules_steam rules_steam+"
@@ -1100,7 +1100,7 @@
             "attributes": {
               "app": "996560",
               "depot": "996562",
-              "manifest": "8852828344330156395",
+              "manifest": "7659625077094485178",
               "files": []
             }
           },

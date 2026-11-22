@@ -1023,8 +1023,8 @@
     },
     "@@rules_sourcemod+//hl2sdk:repositories.bzl%hl2sdk": {
       "general": {
-        "bzlTransitiveDigest": "4cknNVaR6aDQfcJJ1UpFstz88yjBveGy8g/IyfZaNqg=",
-        "usagesDigest": "v+3ZaR3JpW0iMG51FA9FFaqMQu665GSQuC18EdVuRXs=",
+        "bzlTransitiveDigest": "zEoFMxsNk8VfvCNDgp9nzoHTwEKFCIA9z/PQ+RRr23Q=",
+        "usagesDigest": "Vc+EeJ36T/WM37OjAbOQL+Axq/hATXNRNh4YFuswpT0=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "hl2sdk_css": {
@@ -1051,11 +1051,18 @@
               "branch": "sdk2013"
             }
           },
+          "hl2sdk_ep1": {
+            "repoRuleId": "@@rules_sourcemod+//hl2sdk:repositories.bzl%hl2sdk_repository",
+            "attributes": {
+              "branch": "ep1"
+            }
+          },
           "metamod_source": {
             "repoRuleId": "@@rules_sourcemod+//hl2sdk:repositories.bzl%metamod_repository",
             "attributes": {
               "branches": [
                 "css",
+                "ep1",
                 "l4d2",
                 "sdk2013",
                 "tf2"
@@ -1067,7 +1074,7 @@
     },
     "@@rules_sourcemod+//sourcemod:extensions.bzl%sourcemod": {
       "general": {
-        "bzlTransitiveDigest": "npTU1so2EMYRAbHn3MQgeTzld8PGxFyRICmk/A8HY4E=",
+        "bzlTransitiveDigest": "M1IRJFOBwxPRLgJzPO/MKRooox+8R3XilCiZ7Etxb1E=",
         "usagesDigest": "wpaSv30eDqEq0BXV49NA7Hay7Dq6v95BZYCQ/h94SZQ=",
         "recordedInputs": [],
         "generatedRepoSpecs": {

@@ -18,7 +18,7 @@ git_override(
 bazel_dep(name = "auth_by_steam_group")
 git_override(
     module_name = "auth_by_steam_group",
-    commit = "38b959c9ef1d6dfed1b13940b9724d8c68d5d416",
+    commit = "07ccde5763cb8b1c01f16564a8b9c3ac4df461ba",
     remote = "https://github.com/lanofdoom/auth-by-steam-group.git",
 )
 
